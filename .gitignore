@@ -1,0 +1,5 @@
+obj/
+bin/
+*.suo
+frenetic.xml
+FreneticScript.xml
