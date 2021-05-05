@@ -40,33 +40,67 @@ namespace LicenseInjector
                              + "//\r\n"
                              + "\r\n";
 
-        static void Apply(string[] f)
+        public static UTF8Encoding UTF8 = new UTF8Encoding(false);
+
+        static void Apply(string[] fileList)
         {
-            foreach (string file in f)
+            Console.WriteLine($"Scanning {fileList.Length} files...");
+            StringBuilder existingHeaderBuilder = new StringBuilder();
+            foreach (string file in fileList)
             {
-                string t = File.ReadAllText(file);
-                while (t.StartsWith("//") || t.StartsWith("\n") || t.StartsWith("\r\n"))
+                if (file.EndsWith("GlobalSuppressions.cs"))
                 {
-                    int newline = t.IndexOf('\n');
-                    t = t.Substring(newline + 1);
+                    continue;
                 }
-                if (file.Contains("FreneticGameEngine") && file.Contains("FreneticScript") && file.Contains("FreneticUtilities"))
+                string[] fullOriginalContent = File.ReadAllLines(file);
+                if (fullOriginalContent.Length <= 1)
                 {
-                    t = FRENUTIL_MIT_LICENSE + t;
+                    Console.WriteLine($"Skipping empty file {file}.");
+                    continue;
                 }
-                else if (file.Contains("FreneticGameEngine") && file.Contains("FreneticScript"))
+                int firstRealLine = 0;
+                for (int i = 0; i < fullOriginalContent.Length; i++)
                 {
-                    t = FS_MIT_LICENSE + t;
+                    string line = fullOriginalContent[i];
+                    if (string.IsNullOrWhiteSpace(line) || (line.StartsWith("//") && !line.StartsWith("///")))
+                    {
+                        existingHeaderBuilder.Append(line).Append("\r\n");
+                    }
+                    else
+                    {
+                        firstRealLine = i;
+                        break;
+                    }
+                }
+                string content = string.Join("\r\n", fullOriginalContent[firstRealLine..]);
+                string existingHeader = existingHeaderBuilder.ToString().Trim();
+                existingHeaderBuilder.Clear();
+                string header;
+                if (file.Contains("FreneticUtilities") && !file.Contains("FGETests"))
+                {
+                    header = FRENUTIL_MIT_LICENSE;
+                }
+                else if (file.Contains("FreneticScript"))
+                {
+                    header = FS_MIT_LICENSE;
                 }
                 else if (file.Contains("FreneticGameEngine"))
                 {
-                    t = FGE_LICENSE + t;
+                    header = FGE_LICENSE;
                 }
                 else
                 {
-                    t = VOX_LICENSE + t;
+                    header = VOX_LICENSE;
                 }
-                File.WriteAllText(file, t);
+                if (string.IsNullOrWhiteSpace(existingHeader))
+                {
+                    Console.WriteLine($"File {file} was missing header.");
+                }
+                else if (existingHeader != header.Trim())
+                {
+                    Console.WriteLine($"File {file} has pre-existing different header, may need to be checked if unique-header intended.");
+                }
+                File.WriteAllBytes(file, UTF8.GetBytes($"{header}{content}\r\n"));
             }
         }
 
