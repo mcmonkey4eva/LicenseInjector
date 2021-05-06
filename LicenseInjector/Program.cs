@@ -45,16 +45,20 @@ namespace LicenseInjector
         static void Apply(string[] fileList)
         {
             Console.WriteLine($"Scanning {fileList.Length} files...");
+            int untouched = 0, skipped = 0, modified = 0;
             StringBuilder existingHeaderBuilder = new StringBuilder();
             foreach (string file in fileList)
             {
-                if (file.EndsWith("GlobalSuppressions.cs"))
+                string fileName = file.Replace('\\', '/');
+                if (fileName.EndsWith("/GlobalSuppressions.cs") || fileName.Contains("/bin/") || fileName.Contains("/obj/"))
                 {
+                    skipped++;
                     continue;
                 }
                 string[] fullOriginalContent = File.ReadAllLines(file);
                 if (fullOriginalContent.Length <= 1)
                 {
+                    skipped++;
                     Console.WriteLine($"Skipping empty file {file}.");
                     continue;
                 }
@@ -95,13 +99,21 @@ namespace LicenseInjector
                 if (string.IsNullOrWhiteSpace(existingHeader))
                 {
                     Console.WriteLine($"File {file} was missing header.");
+                    modified++;
                 }
                 else if (existingHeader != header.Trim())
                 {
                     Console.WriteLine($"File {file} has pre-existing different header, may need to be checked if unique-header intended.");
+                    modified++;
+                }
+                else
+                {
+                    untouched++;
+                    // Still rewrite anyway, in case of missing NL@EOF or encoding issues.
                 }
                 File.WriteAllBytes(file, UTF8.GetBytes($"{header}{content}\r\n"));
             }
+            Console.WriteLine($"For scan of {fileList.Length}, modified {modified}, skipped {skipped}, and left untouched {untouched}");
         }
 
         static void Main(string[] args)
