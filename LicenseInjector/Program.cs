@@ -42,11 +42,52 @@ namespace LicenseInjector
 
         public static UTF8Encoding UTF8 = new UTF8Encoding(false);
 
-        static void Apply(string[] fileList)
+        static string HeaderFor(string fileName)
+        {
+            if (fileName.Contains("/FreneticUtilities/") && !fileName.Contains("/FGETests/"))
+            {
+                return FRENUTIL_MIT_LICENSE;
+            }
+            else if (fileName.Contains("/FreneticScript/"))
+            {
+                return FS_MIT_LICENSE;
+            }
+            else if (fileName.Contains("/FreneticGameEngine/"))
+            {
+                return FGE_LICENSE;
+            }
+            else
+            {
+                return VOX_LICENSE;
+            }
+        }
+
+        public static StringBuilder SectionBuilderHelper = new StringBuilder();
+
+        static string GetExistingHeader(string[] fileContent, out int firstRealLine)
+        {
+            SectionBuilderHelper.Clear();
+            for (int i = 0; i < fileContent.Length; i++)
+            {
+                string line = fileContent[i];
+                if (string.IsNullOrWhiteSpace(line) || (line.StartsWith("//") && !line.StartsWith("///")))
+                {
+                    SectionBuilderHelper.Append(line).Append("\r\n");
+                }
+                else
+                {
+                    firstRealLine = i;
+                    return SectionBuilderHelper.ToString().Trim();
+                }
+            }
+            firstRealLine = 0;
+            return "";
+        }
+
+        static void Apply(string[] fileList, bool fixUsings)
         {
             Console.WriteLine($"Scanning {fileList.Length} files...");
-            int untouched = 0, skipped = 0, modified = 0;
-            StringBuilder existingHeaderBuilder = new StringBuilder();
+            int untouched = 0, skipped = 0, modified = 0, sorted = 0;
             foreach (string file in fileList)
             {
                 string fileName = file.Replace('\\', '/');
@@ -62,48 +103,23 @@ namespace LicenseInjector
                     Console.WriteLine($"Skipping empty file {file}.");
                     continue;
                 }
-                int firstRealLine = 0;
-                for (int i = 0; i < fullOriginalContent.Length; i++)
-                {
-                    string line = fullOriginalContent[i];
-                    if (string.IsNullOrWhiteSpace(line) || (line.StartsWith("//") && !line.StartsWith("///")))
-                    {
-                        existingHeaderBuilder.Append(line).Append("\r\n");
-                    }
-                    else
-                    {
-                        firstRealLine = i;
-                        break;
-                    }
-                }
+                string existingHeader = GetExistingHeader(fullOriginalContent, out int firstRealLine);
                 string content = string.Join("\r\n", fullOriginalContent[firstRealLine..]);
-                string existingHeader = existingHeaderBuilder.ToString().Trim();
-                existingHeaderBuilder.Clear();
-                string header;
-                if (file.Contains("FreneticUtilities") && !file.Contains("FGETests"))
-                {
-                    header = FRENUTIL_MIT_LICENSE;
-                }
-                else if (file.Contains("FreneticScript"))
-                {
-                    header = FS_MIT_LICENSE;
-                }
-                else if (file.Contains("FreneticGameEngine"))
-                {
-                    header = FGE_LICENSE;
-                }
-                else
-                {
-                    header = VOX_LICENSE;
-                }
+                string header = HeaderFor(fileName);
+                bool changedHeader = false;
                 if (string.IsNullOrWhiteSpace(existingHeader))
                 {
                     Console.WriteLine($"File {file} was missing header.");
-                    modified++;
+                    changedHeader = true;
                 }
                 else if (existingHeader != header.Trim())
                 {
                     Console.WriteLine($"File {file} has pre-existing different header, may need to be checked if unique-header intended.");
+                    changedHeader = true;
+                }
+
+                if (changedHeader)
+                {
                     modified++;
                 }
                 else
@@ -113,14 +129,16 @@ namespace LicenseInjector
                 }
                 File.WriteAllBytes(file, UTF8.GetBytes($"{header}{content}\r\n"));
             }
-            Console.WriteLine($"For scan of {fileList.Length}, modified {modified}, skipped {skipped}, and left untouched {untouched}");
+            Console.WriteLine($"For scan of {fileList.Length}, modified {modified} headers, skipped {skipped}, and left untouched {untouched}");
         }
 
         static void Main(string[] args)
         {
-            Apply(Directory.GetFiles("./", "*.cs", SearchOption.AllDirectories));
-            Apply(Directory.GetFiles("./", "*.fs", SearchOption.AllDirectories));
-            Apply(Directory.GetFiles("./", "*.vs", SearchOption.AllDirectories));
+            Apply(Directory.GetFiles("./", "*.cs", SearchOption.AllDirectories), true);
+            Apply(Directory.GetFiles("./", "*.fs", SearchOption.AllDirectories), false);
+            Apply(Directory.GetFiles("./", "*.vs", SearchOption.AllDirectories), false);
+            Apply(Directory.GetFiles("./", "*.geom", SearchOption.AllDirectories), false);
+            Apply(Directory.GetFiles("./", "*.inc", SearchOption.AllDirectories), false);
         }
     }
 }
