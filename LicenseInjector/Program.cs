@@ -84,10 +84,140 @@ namespace LicenseInjector
             return "";
         }
 
+        static void GetUsings(string[] fileContent, List<string> list, int startIndex, out int firstCodeLine)
+        {
+            firstCodeLine = startIndex;
+            for (int i = startIndex; i < fileContent.Length; i++)
+            {
+                string line = fileContent[i];
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("using "))
+                {
+                    list.Add(line);
+                }
+                else
+                {
+                    firstCodeLine = i;
+                    return;
+                }
+            }
+        }
+
+        public static List<string> UsingStatics = new List<string>(), UsingClasses = new List<string>(), NormalUsings = new List<string>();
+
+        public static string[] RequiredUsings = new string[]
+        {
+            "using System;",
+            "using System.Collections.Generic;",
+            "using System.Text;",
+            "using System.Linq;"
+        };
+
+        static string GetSortedUsings(List<string> usings)
+        {
+            if (!usings.Any())
+            {
+                return "";
+            }
+            SectionBuilderHelper.Clear();
+            UsingStatics.Clear();
+            UsingClasses.Clear();
+            NormalUsings.Clear();
+            foreach (string line in usings)
+            {
+                if (line.StartsWith("using static "))
+                {
+                    UsingStatics.Add(line);
+                }
+                else if (line.Contains("="))
+                {
+                    UsingClasses.Add(line);
+                }
+                else if (!string.IsNullOrWhiteSpace(line))
+                {
+                    NormalUsings.Add(line);
+                }
+            }
+            foreach (string required in RequiredUsings)
+            {
+                if (!NormalUsings.Contains(required))
+                {
+                    NormalUsings.Add(required);
+                }
+            }
+            NormalUsings = NormalUsings.OrderBy(s =>
+            {
+                string mainPart = s["using ".Length..];
+                if (mainPart.StartsWith("System"))
+                {
+                    return 0;
+                }
+                else if (mainPart.StartsWith("FreneticUtilities"))
+                {
+                    return 10;
+                }
+                else if (mainPart.StartsWith("FGECore"))
+                {
+                    return 20;
+                }
+                else if (mainPart.StartsWith("FGEGraphics"))
+                {
+                    return 30;
+                }
+                else if (mainPart.StartsWith("FreneticScript"))
+                {
+                    return 40;
+                }
+                else if (mainPart.StartsWith("Bepu"))
+                {
+                    return 50;
+                }
+                else if (mainPart.StartsWith("OpenTK"))
+                {
+                    return 60;
+                }
+                else if (mainPart.StartsWith("Voxalia.Shared"))
+                {
+                    return 70;
+                }
+                else if (mainPart.StartsWith("Voxalia.Server"))
+                {
+                    return 80;
+                }
+                else if (mainPart.StartsWith("Voxalia.Client"))
+                {
+                    return 90;
+                }
+                return 100;
+            }).ThenBy(s => s).ToList();
+            foreach (string line in NormalUsings)
+            {
+                SectionBuilderHelper.Append(line).Append("\r\n");
+            }
+            if (UsingStatics.Any())
+            {
+                SectionBuilderHelper.Append("\r\n");
+                foreach (string line in UsingStatics.OrderBy(s => s))
+                {
+                    SectionBuilderHelper.Append(line).Append("\r\n");
+                }
+            }
+            if (UsingClasses.Any())
+            {
+                SectionBuilderHelper.Append("\r\n");
+                foreach (string line in UsingClasses.OrderBy(s => s))
+                {
+                    SectionBuilderHelper.Append(line).Append("\r\n");
+                }
+            }
+            SectionBuilderHelper.Append("\r\n");
+            return SectionBuilderHelper.ToString();
+        }
+
         static void Apply(string[] fileList, bool fixUsings)
         {
             Console.WriteLine($"Scanning {fileList.Length} files...");
             int untouched = 0, skipped = 0, modified = 0, sorted = 0;
+            List<string> usings = new List<string>();
             foreach (string file in fileList)
             {
                 string fileName = file.Replace('\\', '/');
@@ -104,7 +234,6 @@ namespace LicenseInjector
                     continue;
                 }
                 string existingHeader = GetExistingHeader(fullOriginalContent, out int firstRealLine);
-                string content = string.Join("\r\n", fullOriginalContent[firstRealLine..]);
                 string header = HeaderFor(fileName);
                 bool changedHeader = false;
                 if (string.IsNullOrWhiteSpace(existingHeader))
@@ -117,19 +246,33 @@ namespace LicenseInjector
                     Console.WriteLine($"File {file} has pre-existing different header, may need to be checked if unique-header intended.");
                     changedHeader = true;
                 }
-
+                string altUsings = "";
+                bool didSort = false;
+                if (fixUsings)
+                {
+                    usings.Clear();
+                    GetUsings(fullOriginalContent, usings, firstRealLine, out firstRealLine);
+                    string originalUsings = string.Join("\r\n", usings);
+                    altUsings = GetSortedUsings(usings);
+                    didSort = originalUsings != altUsings;
+                }
+                string content = string.Join("\r\n", fullOriginalContent[firstRealLine..]);
                 if (changedHeader)
                 {
                     modified++;
                 }
-                else
+                if (didSort)
+                {
+                    sorted++;
+                }
+                if (!changedHeader && !didSort)
                 {
                     untouched++;
                     // Still rewrite anyway, in case of missing NL@EOF or encoding issues.
                 }
-                File.WriteAllBytes(file, UTF8.GetBytes($"{header}{content}\r\n"));
+                File.WriteAllBytes(file, UTF8.GetBytes($"{header}{altUsings}{content}\r\n"));
             }
-            Console.WriteLine($"For scan of {fileList.Length}, modified {modified} headers, skipped {skipped}, and left untouched {untouched}");
+            Console.WriteLine($"For scan of {fileList.Length}, modified {modified} headers, skipped {skipped}, sorted usings for {sorted}, and left untouched {untouched}");
         }
 
         static void Main(string[] args)
