@@ -40,7 +40,7 @@ namespace LicenseInjector
                              + "//\r\n"
                              + "\r\n";
 
-        public static UTF8Encoding UTF8 = new UTF8Encoding(false);
+        public static UTF8Encoding UTF8 = new(false);
 
         static string HeaderFor(string fileName)
         {
@@ -62,7 +62,7 @@ namespace LicenseInjector
             }
         }
 
-        public static StringBuilder SectionBuilderHelper = new StringBuilder();
+        public static StringBuilder SectionBuilderHelper = new();
 
         static string GetExistingHeader(string[] fileContent, out int firstRealLine)
         {
@@ -102,15 +102,15 @@ namespace LicenseInjector
             }
         }
 
-        public static List<string> UsingStatics = new List<string>(), UsingClasses = new List<string>(), NormalUsings = new List<string>();
+        public static List<string> UsingStatics = [], UsingClasses = [], NormalUsings = [];
 
-        public static string[] RequiredUsings = new string[]
-        {
+        public static string[] RequiredUsings =
+        [
             "using System;",
             "using System.Collections.Generic;",
             "using System.Text;",
             "using System.Linq;"
-        };
+        ];
 
         static string GetSortedUsings(List<string> usings)
         {
@@ -128,7 +128,7 @@ namespace LicenseInjector
                 {
                     UsingStatics.Add(line);
                 }
-                else if (line.Contains("="))
+                else if (line.Contains('='))
                 {
                     UsingClasses.Add(line);
                 }
@@ -144,7 +144,7 @@ namespace LicenseInjector
                     NormalUsings.Add(required);
                 }
             }
-            NormalUsings = NormalUsings.OrderBy(s =>
+            NormalUsings = [.. NormalUsings.OrderBy(s =>
             {
                 string mainPart = s["using ".Length..];
                 if (mainPart.StartsWith("System"))
@@ -188,7 +188,7 @@ namespace LicenseInjector
                     return 90;
                 }
                 return 100;
-            }).ThenBy(s => s).ToList();
+            }).ThenBy(s => s)];
             foreach (string line in NormalUsings)
             {
                 SectionBuilderHelper.Append(line).Append("\r\n");
@@ -217,7 +217,7 @@ namespace LicenseInjector
         {
             Console.WriteLine($"Scanning {fileList.Length} files...");
             int untouched = 0, skipped = 0, modified = 0, sorted = 0;
-            List<string> usings = new List<string>();
+            List<string> usings = [];
             foreach (string file in fileList)
             {
                 string fileName = file.Replace('\\', '/');
@@ -275,7 +275,7 @@ namespace LicenseInjector
             Console.WriteLine($"For scan of {fileList.Length}, modified {modified} headers, skipped {skipped}, sorted usings for {sorted}, and left untouched {untouched}");
         }
 
-        static void Main(string[] args)
+        static void Main()
         {
             Apply(Directory.GetFiles("./", "*.cs", SearchOption.AllDirectories), true);
             Apply(Directory.GetFiles("./", "*.fs", SearchOption.AllDirectories), false);
