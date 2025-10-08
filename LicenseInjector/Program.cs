@@ -39,6 +39,12 @@ namespace LicenseInjector
                              + "// See README.md or LICENSE.txt in the FreneticUtilities source root for the contents of the license.\r\n"
                              + "//\r\n"
                              + "\r\n";
+        const string FGEDYNAMICPLANTS_LICENSE = "//\r\n"
+                             + "// This file is part of FGE Dynamic Plants, created by Frenetic LLC.\r\n"
+                             + "// This code is Copyright (C) Frenetic LLC under the terms of the MIT license.\r\n"
+                             + "// See README.md or LICENSE.txt in the FreneticUtilities source root for the contents of the license.\r\n"
+                             + "//\r\n"
+                             + "\r\n";
 
         public static UTF8Encoding UTF8 = new(false);
 
@@ -55,6 +61,10 @@ namespace LicenseInjector
             else if (fileName.Contains("/FreneticGameEngine/"))
             {
                 return FGE_LICENSE;
+            }
+            else if (fileName.Contains("/FGEDynamicPlants/"))
+            {
+                return FGEDYNAMICPLANTS_LICENSE;
             }
             else
             {
@@ -162,6 +172,10 @@ namespace LicenseInjector
                 else if (mainPart.StartsWith("FGEGraphics"))
                 {
                     return 30;
+                }
+                else if (mainPart.StartsWith("FGEDynamicPlants"))
+                {
+                    return 45;
                 }
                 else if (mainPart.StartsWith("FreneticScript"))
                 {
